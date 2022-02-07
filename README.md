@@ -3,10 +3,15 @@
 ### 2022.2.7
 
 `mr/worker.go`
+
 Worker向Coordinator发送rpc来请求map任务
+
 `mr/rpc.go`
+
 定义了用于分配map任务的args和reply
+
 `mr/coordinator.go`
+
 1. 添加类型，用以保存 **文件名→状态** 的映射。注意需要lock
     
     ```go
