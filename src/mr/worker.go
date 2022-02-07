@@ -32,10 +32,16 @@ func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
 	// Your worker implementation here.
+	args := RequireTaskArgs{}
+	reply := RequireTaskReply{}
+	ok := call("Coordinator.AssignTask", &args, &reply)
+	if ok{
+		fmt.Printf("reply is %s", reply.Filename)
+	}
+	
 
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
-
 }
 
 //
@@ -75,6 +81,7 @@ func CallExample() {
 func call(rpcname string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()
+
 	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Fatal("dialing:", err)

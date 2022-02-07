@@ -9,6 +9,11 @@ package mr
 import "os"
 import "strconv"
 
+// arguments for workers requiring tasks
+type RequireTaskArgs struct{}
+type RequireTaskReply struct{
+	Filename string
+}
 //
 // example to show how to declare the arguments
 // and reply for an RPC.
