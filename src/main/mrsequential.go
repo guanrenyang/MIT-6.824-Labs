@@ -27,7 +27,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: mrsequential xxx.so inputfiles...\n")
 		os.Exit(1)
 	}
-
+	
 	mapf, reducef := loadPlugin(os.Args[1])
 
 	//
@@ -35,6 +35,9 @@ func main() {
 	// pass it to Map,
 	// accumulate the intermediate Map output.
 	//
+
+	
+
 	intermediate := []mr.KeyValue{}
 	for _, filename := range os.Args[2:] {
 		file, err := os.Open(filename)
@@ -82,7 +85,7 @@ func main() {
 
 		i = j
 	}
-
+	
 	ofile.Close()
 }
 

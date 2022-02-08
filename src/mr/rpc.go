@@ -13,6 +13,9 @@ import "strconv"
 type RequireTaskArgs struct{}
 type RequireTaskReply struct{
 	Filename string
+	Task string //"map" or "reduce"
+	Map_task_id int 
+	NReduce int
 }
 //
 // example to show how to declare the arguments

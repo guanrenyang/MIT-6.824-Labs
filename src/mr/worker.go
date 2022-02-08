@@ -4,8 +4,8 @@ import "fmt"
 import "log"
 import "net/rpc"
 import "hash/fnv"
-
-
+import "os"
+import "io/ioutil"
 //
 // Map functions return a slice of KeyValue.
 //
@@ -35,15 +35,35 @@ func Worker(mapf func(string, string) []KeyValue,
 	args := RequireTaskArgs{}
 	reply := RequireTaskReply{}
 	ok := call("Coordinator.AssignTask", &args, &reply)
-	if ok{
-		fmt.Printf("reply is %s", reply.Filename)
+	if !ok{
+		fmt.Printf("Assign Task failed!")
 	}
+	
+	if reply.Task=="map"{
+		callMap(mapf, reply.Filename, reply.Map_task_id, reply.NReduce)
+	}
+	
 	
 
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 }
 
+// call map function
+func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id int, nReduce int)  {
+
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("cannot open %v", filename)
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("cannot read %v", filename)
+	}
+	file.Close()
+	kva := mapf(filename, string(content))
+	
+}
 //
 // example function to show how to make an RPC call to the coordinator.
 //
