@@ -43,8 +43,19 @@ modify function `AssignTask` in reponse to the change in `mr.rpc.go`
 
 **TODO**
 
-- [ ] Modify `Worker()` to store intermediate key-value pairs in disk. 
+- [x]  Think how
+to modify `Worker()` to store intermediate key-value pairs in disk.
 
 use iHash(word)%NReduce to compute the id of reduce task
 
 I currently add some simple code in worker.go, but they need big modifications.
+
+### 2022.2.10
+
+`mr/worker.go`
+
+尝试将中间结果保存使用 `json` 格式保存在磁盘上。 *现在还在学习json格式保存的方法*
+
+**TODO**
+
+- [ ] 将中间key/value保存在磁盘上。将变成一个字典，然后将字典编码为json。
