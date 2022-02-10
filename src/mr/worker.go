@@ -6,6 +6,9 @@ import "net/rpc"
 import "hash/fnv"
 import "os"
 import "io/ioutil"
+import "sort"
+import "strconv"
+import "encoding/json"
 //
 // Map functions return a slice of KeyValue.
 //
@@ -13,6 +16,13 @@ type KeyValue struct {
 	Key   string
 	Value string
 }
+// for sorting by key.
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 //
 // use ihash(key) % NReduce to choose the reduce
@@ -62,6 +72,25 @@ func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id 
 	}
 	file.Close()
 	kva := mapf(filename, string(content))
+
+	sort.Sort(ByKey(kva))
+	for _, kv := range kva{
+		reduce_task_id := ihash(kv.Key) % nReduce
+		intFilename := "mr-"+strconv.Itoa(map_task_id)+"-"+strconv.Itoa(reduce_task_id)+".json"
+		
+		intFile, err := os.Open(intFilename)
+		defer intFile.Close()
+
+		if err!=nil && os.IsNotExist(err){
+			intFile, _ = os.Create(intFilename)
+		}
+		
+		enc := json.NewEncoder(intFile)
+
+		enc.Encode(&kv)
+		
+	}
+	
 	
 }
 //
