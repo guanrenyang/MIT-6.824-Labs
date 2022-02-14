@@ -6,9 +6,9 @@ import "net/rpc"
 import "hash/fnv"
 import "os"
 import "io/ioutil"
-import "sort"
+// import "sort"
 import "strconv"
-import "encoding/json"
+// import "encoding/json"
 //
 // Map functions return a slice of KeyValue.
 //
@@ -58,39 +58,57 @@ func Worker(mapf func(string, string) []KeyValue,
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 }
-
+type TmpOneFile map[int][]string
+type TmpAllFile map[string]TmpOneFile
 // call map function
 func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id int, nReduce int)  {
 
+	
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("cannot open %v", filename)
 	}
 	content, err := ioutil.ReadAll(file)
+
 	if err != nil {
 		log.Fatalf("cannot read %v", filename)
 	}
 	file.Close()
 	kva := mapf(filename, string(content))
 
-	sort.Sort(ByKey(kva))
+	var tmpAllFile TmpAllFile = make(TmpAllFile)
 	for _, kv := range kva{
 		reduce_task_id := ihash(kv.Key) % nReduce
-		intFilename := "mr-"+strconv.Itoa(map_task_id)+"-"+strconv.Itoa(reduce_task_id)+".json"
+		tmpFilename := "mr-"+strconv.Itoa(map_task_id)+"-"+strconv.Itoa(reduce_task_id)+".json"
 		
-		intFile, err := os.Open(intFilename)
-		defer intFile.Close()
-
-		if err!=nil && os.IsNotExist(err){
-			intFile, _ = os.Create(intFilename)
+		if _,ok:=tmpAllFile[tmpFilename];!ok{
+			tmpAllFile[tmpFilename] = make(TmpOneFile)
 		}
-		
-		enc := json.NewEncoder(intFile)
+		if _,ok:=tmpAllFile[tmpFilename][reduce_task_id];!ok{
+			tmpAllFile[tmpFilename][reduce_task_id] = []string{}
+		}
 
-		enc.Encode(&kv)
+		tmpAllFile[tmpFilename][reduce_task_id] = append(tmpAllFile[tmpFilename][reduce_task_id], kv.Value)
+	
+		// File I/O
+
+		// intFile, err := os.Open(intFilename)
+		// defer intFile.Close()
+
+		// if err!=nil && os.IsNotExist(err){
+		// 	intFile, _ = os.Create(intFilename)
+		// }
+		
+		// enc := json.NewEncoder(intFile)
+
+		// enc.Encode(&kv)
 		
 	}
-	
+	// fmt.Println(tmpAllFile)
+	// Debug
+	for i, _:= range tmpAllFile{
+		fmt.Println(i)
+	}
 	
 }
 //
