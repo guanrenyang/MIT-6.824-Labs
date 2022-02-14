@@ -59,3 +59,7 @@ I currently add some simple code in worker.go, but they need big modifications.
 **TODO**
 
 - [ ] 将中间key/value保存在磁盘上。将变成一个字典，然后将字典编码为json。
+
+### 2022.2.14
+
+将中间结果保存在内存中————使用两级map
