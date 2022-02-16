@@ -4,14 +4,17 @@ import "os"
 import "fmt"
 import "encoding/json"
 type KV struct{
-	k string ``
+	k string
 	v string
 }
 func main(){
-	kv := KV{"1", "2"}
+	temp := make(map[string][]int)
+	temp["a"] = []int{1,2,3}
+	temp["b"] = []int{4,5,6}
+
 	file, _ := os.Create("temp.json")
 	defer file.Close()
 	enc := json.NewEncoder(file)
-	fmt.Println(kv)
-	enc.Encode(&kv)
-} 
+	fmt.Println(temp)
+	enc.Encode(&temp)
+}

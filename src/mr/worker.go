@@ -8,7 +8,7 @@ import "os"
 import "io/ioutil"
 // import "sort"
 import "strconv"
-// import "encoding/json"
+import "encoding/json"
 //
 // Map functions return a slice of KeyValue.
 //
@@ -89,26 +89,29 @@ func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id 
 		}
 
 		tmpAllFile[tmpFilename][reduce_task_id] = append(tmpAllFile[tmpFilename][reduce_task_id], kv.Value)
+		
+	}
+	for fn, ct := range tmpAllFile{
+		imFile, err := os.Create(fn)
+		if err != nil{
+			fmt.Println("map task "+strconv.Itoa(map_task_id)+": fail to create intermediate file")
+			return
+		}
+
+		encoder := json.NewEncoder(imFile)
+		
+    	err = encoder.Encode(ct)
+    	if err != nil {
+        	fmt.Println("fail to encode json file", err.Error())
+    	} else {
+        	fmt.Println("map task "+strconv.Itoa(map_task_id)+": successfully encode an imtermediate file")
+    	}	
+
+		imFile.Close()
+	}
 	
-		// File I/O
-
-		// intFile, err := os.Open(intFilename)
-		// defer intFile.Close()
-
-		// if err!=nil && os.IsNotExist(err){
-		// 	intFile, _ = os.Create(intFilename)
-		// }
-		
-		// enc := json.NewEncoder(intFile)
-
-		// enc.Encode(&kv)
-		
-	}
-	// fmt.Println(tmpAllFile)
-	// Debug
-	for i, _:= range tmpAllFile{
-		fmt.Println(i)
-	}
+    
+	
 	
 }
 //
