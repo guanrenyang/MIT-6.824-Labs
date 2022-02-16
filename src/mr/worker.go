@@ -50,7 +50,18 @@ func Worker(mapf func(string, string) []KeyValue,
 	}
 	
 	if reply.Task=="map"{
-		callMap(mapf, reply.Filename, reply.Map_task_id, reply.NReduce)
+		err:=callMap(mapf, reply.Filename, reply.NReduce)
+		if err != nil{
+			fmt.Println("callMap fail")
+			return
+		}
+
+		mapFinishArgs := MapFinishArgs{reply.Filename}
+		mapFinishReply := MapFinishReply{}
+		ok := call("Coordinator.MapFinish", &mapFinishArgs, &mapFinishReply)
+		if !ok{
+			fmt.Println("call Coordinator.MapFinish fail")
+		}
 	}
 	
 	
@@ -58,11 +69,12 @@ func Worker(mapf func(string, string) []KeyValue,
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 }
-type TmpOneFile map[int][]string
+type TmpOneFile map[string][]string
 type TmpAllFile map[string]TmpOneFile
 // call map function
-func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id int, nReduce int)  {
+func callMap(mapf func(string, string) []KeyValue, filename string, nReduce int) error {
 
+	map_task_id := ihash(filename)
 	
 	file, err := os.Open(filename)
 	if err != nil {
@@ -84,22 +96,22 @@ func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id 
 		if _,ok:=tmpAllFile[tmpFilename];!ok{
 			tmpAllFile[tmpFilename] = make(TmpOneFile)
 		}
-		if _,ok:=tmpAllFile[tmpFilename][reduce_task_id];!ok{
-			tmpAllFile[tmpFilename][reduce_task_id] = []string{}
+		if _,ok:=tmpAllFile[tmpFilename][kv.Key];!ok{
+			tmpAllFile[tmpFilename][kv.Key] = []string{}
 		}
 
-		tmpAllFile[tmpFilename][reduce_task_id] = append(tmpAllFile[tmpFilename][reduce_task_id], kv.Value)
+		tmpAllFile[tmpFilename][kv.Key] = append(tmpAllFile[tmpFilename][kv.Key], kv.Value)
 		
 	}
 	for fn, ct := range tmpAllFile{
 		imFile, err := os.Create(fn)
 		if err != nil{
 			fmt.Println("map task "+strconv.Itoa(map_task_id)+": fail to create intermediate file")
-			return
+			return err
 		}
 
 		encoder := json.NewEncoder(imFile)
-		
+
     	err = encoder.Encode(ct)
     	if err != nil {
         	fmt.Println("fail to encode json file", err.Error())
@@ -110,6 +122,7 @@ func callMap(mapf func(string, string) []KeyValue, filename string, map_task_id 
 		imFile.Close()
 	}
 	
+	return nil
     
 	
 	

@@ -1,5 +1,6 @@
 # MIT-6.824-Lab1
-
+### Requirements
+* workers may crash but coornaditor won't
 ### 2022.2.7
 
 `mr/worker.go`
@@ -58,8 +59,23 @@ I currently add some simple code in worker.go, but they need big modifications.
 
 **TODO**
 
-- [ ] 将中间key/value保存在磁盘上。将变成一个字典，然后将字典编码为json。
+- [x] 将中间key/value保存在磁盘上。将变成一个字典，然后将字典编码为json。
 
 ### 2022.2.14
 
 将中间结果保存在内存中————使用两级map
+
+### 2022.2.16
+
+store intermediate kvs in disk
+
+delete `Map_task_id` in struct `RequireTaskReply` and use `ihash(filename)` instead. Thus the map task id will no longer rely on the sequence of reading input files, and **we could know the id even if the coordiantor fails.**
+
+**TODO**
+
+- [ ] use TempFile to deal with the failing if workers
+- [ ] store `mapTask2state` in disk in case of coordinator failing
+
+**Possible Improvement**
+
+* If the worker called `MapFinish` but didn't receive reply, some problem of the network could occur. In this case, the worker just need to call `MapFinish` again instead of doing the map task again.

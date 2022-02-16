@@ -15,7 +15,6 @@ type TaskStateMap struct{
 type Coordinator struct {
 	// Your definitions here.
 	mapTask2state TaskStateMap //0-unstarted, 1-processing, 2-finished
-	mapTask2id map[string]int
 	nReduce int
 }
 
@@ -30,7 +29,6 @@ func (c *Coordinator) AssignTask(args *RequireTaskArgs, reply *RequireTaskReply)
 			c.mapTask2state.mu.Unlock()
 			reply.Filename  = key
 			reply.Task = "map"
-			reply.Map_task_id = c.mapTask2id[key]
 			reply.NReduce = c.nReduce
 			return nil
 		}
@@ -39,7 +37,13 @@ func (c *Coordinator) AssignTask(args *RequireTaskArgs, reply *RequireTaskReply)
 	reply.Filename = "not file"
 	return nil
 }
-
+func (c *Coordinator) MapFinish(args *MapFinishArgs, reply *MapFinishArgs) error {
+	filename := args.Filename
+	c.mapTask2state.mu.Lock()
+	c.mapTask2state.m[filename] = 2
+	c.mapTask2state.mu.Unlock()
+	return nil
+}
 //
 // an example RPC handler.
 //
@@ -92,12 +96,11 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 
 	// Your code here.
 	c.mapTask2state.m = make(map[string]int)
-	c.mapTask2id = make(map[string]int)
+	// c.mapTask2id = make(map[string]int)
 	// Set initial state
 	c.mapTask2state.mu.Lock()
-	for i,filename := range files{
+	for _,filename := range files{
 		c.mapTask2state.m[filename] = 0 // 0 means `unstated`
-		c.mapTask2id[filename] = i
 	}
 	c.mapTask2state.mu.Unlock()
 

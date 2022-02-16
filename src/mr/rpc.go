@@ -14,9 +14,15 @@ type RequireTaskArgs struct{}
 type RequireTaskReply struct{
 	Filename string
 	Task string //"map" or "reduce"
-	Map_task_id int 
 	NReduce int
 }
+//
+// arguments for finishing map task
+type MapFinishArgs struct{
+	Filename string
+}
+type MapFinishReply struct{}
+
 //
 // example to show how to declare the arguments
 // and reply for an RPC.
