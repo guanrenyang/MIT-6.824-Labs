@@ -9,6 +9,7 @@ import "io/ioutil"
 // import "sort"
 import "strconv"
 import "encoding/json"
+import "time"
 //
 // Map functions return a slice of KeyValue.
 //
@@ -44,9 +45,17 @@ func Worker(mapf func(string, string) []KeyValue,
 	// Your worker implementation here.
 	args := RequireTaskArgs{}
 	reply := RequireTaskReply{}
-	ok := call("Coordinator.AssignTask", &args, &reply)
-	if !ok{
-		fmt.Printf("Assign Task failed!")
+	//periodically call "Coordinator.AssignTask"
+	call("Coordinator.AssignTask", &args, &reply)
+	for reply.NeedWait == true{
+		time.Sleep(time.Second)
+
+		reply.NeedWait = false
+		call("Coordinator.AssignTask", &args, &reply)
+	}
+
+	if reply.Exit==true{
+		return
 	}
 	
 	if reply.Task=="map"{
@@ -62,6 +71,8 @@ func Worker(mapf func(string, string) []KeyValue,
 		if !ok{
 			fmt.Println("call Coordinator.MapFinish fail")
 		}
+	} else if reply.Task=="reduce"{
+		callReduce(reducef, reply.Filename)
 	}
 	
 	
@@ -126,6 +137,12 @@ func callMap(mapf func(string, string) []KeyValue, filename string, nReduce int)
     
 	
 	
+}
+//call reduce function
+func callReduce(reducef func(string, []string) string, reduce_task_id string) error {
+
+	// call a reduce funciton
+	return nil
 }
 //
 // example function to show how to make an RPC call to the coordinator.

@@ -71,11 +71,20 @@ store intermediate kvs in disk
 
 delete `Map_task_id` in struct `RequireTaskReply` and use `ihash(filename)` instead. Thus the map task id will no longer rely on the sequence of reading input files, and **we could know the id even if the coordiantor fails.**
 
+add struct `MapDone` in coordinator to indicate whether all the map tasks are finished
+
 **TODO**
 
 - [ ] use TempFile to deal with the failing if workers
 - [ ] store `mapTask2state` in disk in case of coordinator failing
+- [ ] refactor the code of assigning tasks in one function
+- [ ] refactor the if-branch of `globalState` to switch-branch. 
+- [ ] **finish `callReduce` function and corresponding code in `Worker()`**
 
 **Possible Improvement**
 
 * If the worker called `MapFinish` but didn't receive reply, some problem of the network could occur. In this case, the worker just need to call `MapFinish` again instead of doing the map task again.
+
+* I use the same logic to assgin `map` and `redcue` tasks. Thus the two segments of code are similar and should be in one function.
+
+* Improve time efficiency of `Coordinator.MapFinish`

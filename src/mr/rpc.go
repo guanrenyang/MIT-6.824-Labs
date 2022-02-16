@@ -15,6 +15,8 @@ type RequireTaskReply struct{
 	Filename string
 	Task string //"map" or "reduce"
 	NReduce int
+	NeedWait bool
+	Exit bool
 }
 //
 // arguments for finishing map task
