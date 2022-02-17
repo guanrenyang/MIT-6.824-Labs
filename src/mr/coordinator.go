@@ -68,6 +68,9 @@ func (c *Coordinator) AssignTask(args *RequireTaskArgs, reply *RequireTaskReply)
 	c.reduceTask2State.mu.Lock()
 	defer c.reduceTask2State.mu.Unlock()
 	
+	// DEBUG
+	fmt.Println(c.reduceTask2State.m)
+
 	if c.reduceTask2State.globalState==0{
 		// if there is some map task to assign, the function will return in the `for` loop
 		for key := range c.reduceTask2State.m{
@@ -171,11 +174,11 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 
 	c.nReduce = nReduce
 
+	c.mapTask2state.mu.Lock()
 	// Your code here.
 	c.mapTask2state.m = make(map[string]int)
-	// c.mapTask2id = make(map[string]int)
+
 	// Set initial state of map task
-	c.mapTask2state.mu.Lock()
 	for _,filename := range files{
 		c.mapTask2state.m[filename] = 0 // 0 means `unstated`
 	}

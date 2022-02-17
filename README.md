@@ -81,10 +81,29 @@ add struct `MapDone` in coordinator to indicate whether all the map tasks are fi
 - [ ] refactor the if-branch of `globalState` to switch-branch. 
 - [ ] **finish `callReduce` function and corresponding code in `Worker()`**
 
-**Possible Improvement**
+**Possible Improvements**
 
 * If the worker called `MapFinish` but didn't receive reply, some problem of the network could occur. In this case, the worker just need to call `MapFinish` again instead of doing the map task again.
 
 * I use the same logic to assgin `map` and `redcue` tasks. Thus the two segments of code are similar and should be in one function.
 
 * Improve time efficiency of `Coordinator.MapFinish`
+
+### 2022.2.17
+
+**Fix a bug:** reduce task ids might not fill 0-nReduce-1, so it must be determined by map task instead of nReduce. 
+Because `nReduce` is much smaller than `nMap`, I take the strategy that the reducer return `done` to the coordinator if it receives a empty reduce task.
+
+**`callReduce` Function in `/mr/Worker.go`:** 
+1. read intermediates kvs in a multi-level map `tmpAllFile`
+2. merge intermediate kvs in a single-level map `intermediate`
+
+**TODO**
+
+- [ ] steal code from `mrsequential.go` and finish `callReduce`
+- [ ] send a *Reduce Task Finish* signal to the coordinator when the reduce task not existing. This funtion could be in `ReduceFinish` or in another function.
+- [ ] add a `ReduceFinish` function in `mr/coordinator.go`
+
+**Possible Improvements**
+
+* reducer merging multiple intermediate files: current verson is reading all file in memory and then merge them, so the total memory usage is `2*all kvs`. It could be imporved by merging while reading files.

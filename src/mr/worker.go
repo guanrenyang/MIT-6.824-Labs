@@ -10,6 +10,7 @@ import "io/ioutil"
 import "strconv"
 import "encoding/json"
 import "time"
+import "path/filepath"
 //
 // Map functions return a slice of KeyValue.
 //
@@ -141,7 +142,55 @@ func callMap(mapf func(string, string) []KeyValue, filename string, nReduce int)
 //call reduce function
 func callReduce(reducef func(string, []string) string, reduce_task_id string) error {
 
-	// call a reduce funciton
+	// load all intermediate files
+	pwd,_ := os.Getwd()
+	
+	filepathNames,err := filepath.Glob(filepath.Join(pwd,"mr-*-"+reduce_task_id+".json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	if len(filepathNames) == 0{
+		// send task done rpc to coordinator
+	}
+
+	var tmpAllFile TmpAllFile = make(TmpAllFile)
+	for _, filename := range filepathNames {
+
+		file, err := os.Open(filename)
+		if err != nil{
+			log.Fatalf("cannot open %v", filename)
+		}
+
+		decoder := json.NewDecoder(file)
+		
+		tmpOneFile := make(TmpOneFile)
+
+		err = decoder.Decode(&tmpOneFile)
+		if err!=nil{
+			fmt.Println("reduce task "+reduce_task_id+": fail to decode a json file")
+		} else{
+			fmt.Println("reduce task "+reduce_task_id+": successfully decode a json file")
+			//DEBUG
+			fmt.Println(tmpOneFile)
+		}
+
+		tmpAllFile[filename] = tmpOneFile
+		
+		file.Close()
+	}
+
+	// merge multiple maps
+	intermediate := make(map[string][]string)
+	for _, singleFileMap := range tmpAllFile{
+		for key := range singleFileMap{
+			intermediate[key] = append(intermediate[key], singleFileMap[key]...)
+		}
+	}
+	
+	fmt.Println("\nMerged Map:")
+	fmt.Println(intermediate)
+
 	return nil
 }
 //
