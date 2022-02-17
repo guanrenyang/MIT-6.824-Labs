@@ -100,10 +100,11 @@ func (c *Coordinator) AssignTask(args *RequireTaskArgs, reply *RequireTaskReply)
 	reply.Exit = true
 	return nil
 }
+
 func (c *Coordinator) MapFinish(args *MapFinishArgs, reply *MapFinishArgs) error {
 	filename := args.Filename
 	c.mapTask2state.mu.Lock()
-	
+	defer c.mapTask2state.mu.Unlock()
 
 	c.mapTask2state.m[filename] = 2
 	
@@ -121,8 +122,36 @@ func (c *Coordinator) MapFinish(args *MapFinishArgs, reply *MapFinishArgs) error
 			break
 		}
 	}
-	c.mapTask2state.mu.Unlock()
+	// DEBUG
+	fmt.Println(c.mapTask2state.m)
 	return nil
+}
+
+func (c *Coordinator) ReduceFinish(args *ReduceFinishArgs, reply *ReduceFinishReply) error{
+	task_id := args.Filename
+	
+	c.reduceTask2State.mu.Lock()
+	defer c.reduceTask2State.mu.Unlock()
+
+	c.reduceTask2State.m[task_id] = 2
+
+	//check whether all the reduce tasks are done
+	c.reduceTask2State.globalState = 2
+	for _, singleState := range c.reduceTask2State.m{
+		if singleState == 1{
+			c.reduceTask2State.globalState = 1
+			break
+		}
+	}
+	for _, singleState := range c.reduceTask2State.m{
+		if singleState == 0{
+			c.reduceTask2State.globalState = 0
+			break
+		}
+	}
+
+	return nil
+
 }
 //
 // an example RPC handler.
@@ -159,7 +188,11 @@ func (c *Coordinator) Done() bool {
 	ret := false
 
 	// Your code here.
-
+	c.reduceTask2State.mu.Lock()
+	defer c.reduceTask2State.mu.Unlock()
+	if c.reduceTask2State.globalState == 2{
+		ret = true
+	}
 
 	return ret
 }

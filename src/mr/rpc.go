@@ -24,6 +24,12 @@ type MapFinishArgs struct{
 	Filename string
 }
 type MapFinishReply struct{}
+//
+// arguments for finishing reduce task
+type ReduceFinishArgs struct{
+	Filename string
+}
+type ReduceFinishReply struct{}
 
 //
 // example to show how to declare the arguments

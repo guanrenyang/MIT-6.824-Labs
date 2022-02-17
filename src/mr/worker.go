@@ -73,7 +73,18 @@ func Worker(mapf func(string, string) []KeyValue,
 			fmt.Println("call Coordinator.MapFinish fail")
 		}
 	} else if reply.Task=="reduce"{
-		callReduce(reducef, reply.Filename)
+		err:=callReduce(reducef, reply.Filename)
+		if err != nil{
+			fmt.Println("callReduce fail")
+			return
+		}
+
+		reduceFinishArgs := ReduceFinishArgs{reply.Filename}
+		reduceFinishReply := ReduceFinishReply{}
+		ok := call("Coordinator.ReduceFinish", &reduceFinishArgs, &reduceFinishReply)
+		if !ok{
+			fmt.Println("call Coordinator.ReduceFinish fail")
+		}
 	}
 	
 	
@@ -151,7 +162,7 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 	}
 	
 	if len(filepathNames) == 0{
-		// send task done rpc to coordinator
+		return nil
 	}
 
 	var tmpAllFile TmpAllFile = make(TmpAllFile)
@@ -188,8 +199,26 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 		}
 	}
 	
-	fmt.Println("\nMerged Map:")
-	fmt.Println(intermediate)
+	// // DEBUG
+	// fmt.Println("\nMerged Map:")
+	// fmt.Println(intermediate)
+
+	oname := "mr-out-"+reduce_task_id
+	ofile, _ := os.Create(oname)
+
+	//
+	// call Reduce on each distinct key in intermediate[],
+	// and print the result to mr-out-reduce_task_id.
+	//
+	for key, values := range intermediate {
+	
+		output := reducef(key, values)
+
+		// this is the correct format for each line of Reduce output.
+		fmt.Fprintf(ofile, "%v %v\n", key, output)
+	}
+	
+	ofile.Close()
 
 	return nil
 }

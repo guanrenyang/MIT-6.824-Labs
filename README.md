@@ -25,8 +25,7 @@ Worker向Coordinator发送rpc来请求map任务
 2. 实现函数 `AssignTask(args *RequireTaskArgs, reply *RequireTaskReply)` 。*到目前为止：如果有未开始的工作就分配工作，**如果没有未开始的工作没有处理。**
 
 **TODO**
-- [ ] `AssignTask`处理没有任务再分配的情况
-- [ ] 没有任务的Worker周期性请求任务
+- [x] `AssignTask`处理没有任务再分配的情况
 
 ### 2022.2.8
 
@@ -79,7 +78,7 @@ add struct `MapDone` in coordinator to indicate whether all the map tasks are fi
 - [ ] store `mapTask2state` in disk in case of coordinator failing
 - [ ] refactor the code of assigning tasks in one function
 - [ ] refactor the if-branch of `globalState` to switch-branch. 
-- [ ] **finish `callReduce` function and corresponding code in `Worker()`**
+- [x] **finish `callReduce` function and corresponding code in `Worker()`**
 
 **Possible Improvements**
 
@@ -97,12 +96,14 @@ Because `nReduce` is much smaller than `nMap`, I take the strategy that the redu
 **`callReduce` Function in `/mr/Worker.go`:** 
 1. read intermediates kvs in a multi-level map `tmpAllFile`
 2. merge intermediate kvs in a single-level map `intermediate`
+3. call `reducef` and store the out file on disk
 
 **TODO**
 
-- [ ] steal code from `mrsequential.go` and finish `callReduce`
-- [ ] send a *Reduce Task Finish* signal to the coordinator when the reduce task not existing. This funtion could be in `ReduceFinish` or in another function.
-- [ ] add a `ReduceFinish` function in `mr/coordinator.go`
+- [x] steal code from `mrsequential.go` and finish `callReduce`
+- [x] send a *Reduce Task Finish* signal to the coordinator when the reduce task not existing. This funtion could be in `ReduceFinish` or in another function.
+- [x] add a `ReduceFinish` function in `mr/coordinator.go`
+- [ ] **没有任务的Worker周期性请求任务. `test-mr.sh` only creates three worker threads.**
 
 **Possible Improvements**
 
