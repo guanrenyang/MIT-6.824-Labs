@@ -1,16 +1,20 @@
 package mr
 
-import "fmt"
-import "log"
-import "net/rpc"
-import "hash/fnv"
-import "os"
-import "io/ioutil"
+import (
+	"encoding/json"
+	"fmt"
+	"hash/fnv"
+	"io/ioutil"
+	"log"
+	"net/rpc"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+)
+
 // import "sort"
-import "strconv"
-import "encoding/json"
-import "time"
-import "path/filepath"
+
 //
 // Map functions return a slice of KeyValue.
 //
@@ -18,6 +22,7 @@ type KeyValue struct {
 	Key   string
 	Value string
 }
+
 // for sorting by key.
 type ByKey []KeyValue
 
@@ -36,7 +41,6 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-
 //
 // main/mrworker.go calls this function.
 //
@@ -45,60 +49,75 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	// Your worker implementation here.
 	args := RequireTaskArgs{}
-	reply := RequireTaskReply{}
+	reply := RequireTaskReply{NeedWait: true}
 	//periodically call "Coordinator.AssignTask"
-	call("Coordinator.AssignTask", &args, &reply)
-	for reply.NeedWait == true{
+	// call("Coordinator.AssignTask", &args, &reply)
+	for reply.NeedWait == true {
 		time.Sleep(time.Second)
 
 		reply.NeedWait = false
-		call("Coordinator.AssignTask", &args, &reply)
-	}
-
-	if reply.Exit==true{
-		return
-	}
-	
-	if reply.Task=="map"{
-		err:=callMap(mapf, reply.Filename, reply.NReduce)
-		if err != nil{
-			fmt.Println("callMap fail")
+		ok := call("Coordinator.AssignTask", &args, &reply)
+		if !ok { // if the coordinator has exited, the worker should alse exit
 			return
 		}
-
-		mapFinishArgs := MapFinishArgs{reply.Filename}
-		mapFinishReply := MapFinishReply{}
-		ok := call("Coordinator.MapFinish", &mapFinishArgs, &mapFinishReply)
-		if !ok{
-			fmt.Println("call Coordinator.MapFinish fail")
+		if reply.NeedWait == true { // if the worker need wait, just skip to the next requiring
+			continue
 		}
-	} else if reply.Task=="reduce"{
-		err:=callReduce(reducef, reply.Filename)
-		if err != nil{
-			fmt.Println("callReduce fail")
+
+		// if the worker doesn't need to wait, do the job
+		if reply.Exit == true {
 			return
 		}
+		//DEBUG
+		fmt.Println(reply.Filename)
 
-		reduceFinishArgs := ReduceFinishArgs{reply.Filename}
-		reduceFinishReply := ReduceFinishReply{}
-		ok := call("Coordinator.ReduceFinish", &reduceFinishArgs, &reduceFinishReply)
-		if !ok{
-			fmt.Println("call Coordinator.ReduceFinish fail")
+		if reply.Task == "map" {
+			err := callMap(mapf, reply.Filename, reply.NReduce)
+			if err != nil {
+				fmt.Println("callMap fail")
+				return
+			}
+
+			mapFinishArgs := MapFinishArgs{reply.Filename}
+			mapFinishReply := MapFinishReply{}
+			ok := call("Coordinator.MapFinish", &mapFinishArgs, &mapFinishReply)
+			if !ok {
+				fmt.Println("call Coordinator.MapFinish fail")
+			}
+		} else if reply.Task == "reduce" {
+			err := callReduce(reducef, reply.Filename)
+			if err != nil {
+				fmt.Println("callReduce fail")
+				return
+			}
+
+			reduceFinishArgs := ReduceFinishArgs{reply.Filename}
+			reduceFinishReply := ReduceFinishReply{}
+			ok := call("Coordinator.ReduceFinish", &reduceFinishArgs, &reduceFinishReply)
+			if !ok {
+				fmt.Println("call Coordinator.ReduceFinish fail")
+			}
 		}
+
+		// set `NeedWait=true` to require another job
+		reply.NeedWait = true
 	}
-	
-	
 
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 }
+
 type TmpOneFile map[string][]string
 type TmpAllFile map[string]TmpOneFile
+
+// // do a job
+// func doJob()
+
 // call map function
 func callMap(mapf func(string, string) []KeyValue, filename string, nReduce int) error {
 
 	map_task_id := ihash(filename)
-	
+
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("cannot open %v", filename)
@@ -112,56 +131,55 @@ func callMap(mapf func(string, string) []KeyValue, filename string, nReduce int)
 	kva := mapf(filename, string(content))
 
 	var tmpAllFile TmpAllFile = make(TmpAllFile)
-	for _, kv := range kva{
+	for _, kv := range kva {
 		reduce_task_id := ihash(kv.Key) % nReduce
-		tmpFilename := "mr-"+strconv.Itoa(map_task_id)+"-"+strconv.Itoa(reduce_task_id)+".json"
-		
-		if _,ok:=tmpAllFile[tmpFilename];!ok{
+		tmpFilename := "mr-" + strconv.Itoa(map_task_id) + "-" + strconv.Itoa(reduce_task_id) + ".json"
+
+		if _, ok := tmpAllFile[tmpFilename]; !ok {
 			tmpAllFile[tmpFilename] = make(TmpOneFile)
 		}
-		if _,ok:=tmpAllFile[tmpFilename][kv.Key];!ok{
+		if _, ok := tmpAllFile[tmpFilename][kv.Key]; !ok {
 			tmpAllFile[tmpFilename][kv.Key] = []string{}
 		}
 
 		tmpAllFile[tmpFilename][kv.Key] = append(tmpAllFile[tmpFilename][kv.Key], kv.Value)
-		
+
 	}
-	for fn, ct := range tmpAllFile{
+	for fn, ct := range tmpAllFile {
 		imFile, err := os.Create(fn)
-		if err != nil{
-			fmt.Println("map task "+strconv.Itoa(map_task_id)+": fail to create intermediate file")
+		if err != nil {
+			fmt.Println("map task " + strconv.Itoa(map_task_id) + ": fail to create intermediate file")
 			return err
 		}
 
 		encoder := json.NewEncoder(imFile)
 
-    	err = encoder.Encode(ct)
-    	if err != nil {
-        	fmt.Println("fail to encode json file", err.Error())
-    	} else {
-        	fmt.Println("map task "+strconv.Itoa(map_task_id)+": successfully encode an imtermediate file")
-    	}	
+		err = encoder.Encode(ct)
+		if err != nil {
+			fmt.Println("fail to encode json file", err.Error())
+		} else {
+			fmt.Println("map task " + strconv.Itoa(map_task_id) + ": successfully encode an imtermediate file")
+		}
 
 		imFile.Close()
 	}
-	
+
 	return nil
-    
-	
-	
+
 }
+
 //call reduce function
 func callReduce(reducef func(string, []string) string, reduce_task_id string) error {
 
 	// load all intermediate files
-	pwd,_ := os.Getwd()
-	
-	filepathNames,err := filepath.Glob(filepath.Join(pwd,"mr-*-"+reduce_task_id+".json"))
+	pwd, _ := os.Getwd()
+
+	filepathNames, err := filepath.Glob(filepath.Join(pwd, "mr-*-"+reduce_task_id+".json"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	
-	if len(filepathNames) == 0{
+
+	if len(filepathNames) == 0 {
 		return nil
 	}
 
@@ -169,41 +187,41 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 	for _, filename := range filepathNames {
 
 		file, err := os.Open(filename)
-		if err != nil{
+		if err != nil {
 			log.Fatalf("cannot open %v", filename)
 		}
 
 		decoder := json.NewDecoder(file)
-		
+
 		tmpOneFile := make(TmpOneFile)
 
 		err = decoder.Decode(&tmpOneFile)
-		if err!=nil{
-			fmt.Println("reduce task "+reduce_task_id+": fail to decode a json file")
-		} else{
-			fmt.Println("reduce task "+reduce_task_id+": successfully decode a json file")
+		if err != nil {
+			fmt.Println("reduce task " + reduce_task_id + ": fail to decode a json file")
+		} else {
+			fmt.Println("reduce task " + reduce_task_id + ": successfully decode a json file")
 			//DEBUG
 			fmt.Println(tmpOneFile)
 		}
 
 		tmpAllFile[filename] = tmpOneFile
-		
+
 		file.Close()
 	}
 
 	// merge multiple maps
 	intermediate := make(map[string][]string)
-	for _, singleFileMap := range tmpAllFile{
-		for key := range singleFileMap{
+	for _, singleFileMap := range tmpAllFile {
+		for key := range singleFileMap {
 			intermediate[key] = append(intermediate[key], singleFileMap[key]...)
 		}
 	}
-	
+
 	// // DEBUG
 	// fmt.Println("\nMerged Map:")
 	// fmt.Println(intermediate)
 
-	oname := "mr-out-"+reduce_task_id
+	oname := "mr-out-" + reduce_task_id
 	ofile, _ := os.Create(oname)
 
 	//
@@ -211,17 +229,18 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 	// and print the result to mr-out-reduce_task_id.
 	//
 	for key, values := range intermediate {
-	
+
 		output := reducef(key, values)
 
 		// this is the correct format for each line of Reduce output.
 		fmt.Fprintf(ofile, "%v %v\n", key, output)
 	}
-	
+
 	ofile.Close()
 
 	return nil
 }
+
 //
 // example function to show how to make an RPC call to the coordinator.
 //
