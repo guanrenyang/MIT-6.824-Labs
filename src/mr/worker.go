@@ -69,7 +69,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			return
 		}
 		//DEBUG
-		fmt.Println(reply.Filename)
+		// fmt.Println(reply.Filename)
 
 		if reply.Task == "map" {
 			err := callMap(mapf, reply.Filename, reply.NReduce)
@@ -78,27 +78,15 @@ func Worker(mapf func(string, string) []KeyValue,
 				return
 			}
 
-			mapFinishArgs := MapFinishArgs{reply.Filename}
-			mapFinishReply := MapFinishReply{}
-			ok := call("Coordinator.MapFinish", &mapFinishArgs, &mapFinishReply)
-			if !ok {
-				fmt.Println("call Coordinator.MapFinish fail")
-			}
 		} else if reply.Task == "reduce" {
 			err := callReduce(reducef, reply.Filename)
 			if err != nil {
 				fmt.Println("callReduce fail")
 				return
 			}
-
-			reduceFinishArgs := ReduceFinishArgs{reply.Filename}
-			reduceFinishReply := ReduceFinishReply{}
-			ok := call("Coordinator.ReduceFinish", &reduceFinishArgs, &reduceFinishReply)
-			if !ok {
-				fmt.Println("call Coordinator.ReduceFinish fail")
-			}
 		}
-
+		//DEBUG
+		// fmt.Println(reply.Task, reply.Filename)
 		// set `NeedWait=true` to require another job
 		reply.NeedWait = true
 	}
@@ -145,25 +133,39 @@ func callMap(mapf func(string, string) []KeyValue, filename string, nReduce int)
 		tmpAllFile[tmpFilename][kv.Key] = append(tmpAllFile[tmpFilename][kv.Key], kv.Value)
 
 	}
-	for fn, ct := range tmpAllFile {
-		imFile, err := os.Create(fn)
+
+	tmp2perm := make(map[string]string) // temp file name -> permernanent file name
+	pwd, _ := os.Getwd()
+	for fn, ct := range tmpAllFile { //fn->filename, ct->contents
+		tmpImFile, err := ioutil.TempFile(pwd, "tmp")
+		tmp2perm[tmpImFile.Name()] = fn
 		if err != nil {
 			fmt.Println("map task " + strconv.Itoa(map_task_id) + ": fail to create intermediate file")
 			return err
 		}
 
-		encoder := json.NewEncoder(imFile)
+		encoder := json.NewEncoder(tmpImFile)
 
 		err = encoder.Encode(ct)
 		if err != nil {
 			fmt.Println("fail to encode json file", err.Error())
 		} else {
-			fmt.Println("map task " + strconv.Itoa(map_task_id) + ": successfully encode an imtermediate file")
+			// fmt.Println("map task " + strconv.Itoa(map_task_id) + ": successfully encode an imtermediate file")
 		}
 
-		imFile.Close()
+		tmpImFile.Close()
 	}
 
+	mapFinishArgs := MapFinishArgs{filename}
+	mapFinishReply := MapFinishReply{}
+	ok := call("Coordinator.MapFinish", &mapFinishArgs, &mapFinishReply)
+	if !ok {
+		fmt.Println("call Coordinator.MapFinish fail")
+	} else {
+		for tmpName, permName := range tmp2perm {
+			os.Rename(tmpName, permName)
+		}
+	}
 	return nil
 
 }
@@ -180,7 +182,9 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 	}
 
 	if len(filepathNames) == 0 {
-		return nil
+		reduceFinishArgs := ReduceFinishArgs{reduce_task_id}
+		reduceFinishReply := ReduceFinishReply{}
+		call("Coordinator.ReduceFinish", &reduceFinishArgs, &reduceFinishReply)
 	}
 
 	var tmpAllFile TmpAllFile = make(TmpAllFile)
@@ -199,15 +203,15 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 		if err != nil {
 			fmt.Println("reduce task " + reduce_task_id + ": fail to decode a json file")
 		} else {
-			fmt.Println("reduce task " + reduce_task_id + ": successfully decode a json file")
-			//DEBUG
-			fmt.Println(tmpOneFile)
+			// fmt.Println("reduce task " + reduce_task_id + ": successfully decode a json file")
 		}
 
 		tmpAllFile[filename] = tmpOneFile
 
 		file.Close()
 	}
+	//DEBUG
+	// fmt.Println("here")
 
 	// merge multiple maps
 	intermediate := make(map[string][]string)
@@ -217,12 +221,8 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 		}
 	}
 
-	// // DEBUG
-	// fmt.Println("\nMerged Map:")
-	// fmt.Println(intermediate)
-
 	oname := "mr-out-" + reduce_task_id
-	ofile, _ := os.Create(oname)
+	tmpOFile, _ := ioutil.TempFile(pwd, "tmp")
 
 	//
 	// call Reduce on each distinct key in intermediate[],
@@ -233,11 +233,19 @@ func callReduce(reducef func(string, []string) string, reduce_task_id string) er
 		output := reducef(key, values)
 
 		// this is the correct format for each line of Reduce output.
-		fmt.Fprintf(ofile, "%v %v\n", key, output)
+		fmt.Fprintf(tmpOFile, "%v %v\n", key, output)
 	}
 
-	ofile.Close()
-
+	reduceFinishArgs := ReduceFinishArgs{reduce_task_id}
+	reduceFinishReply := ReduceFinishReply{}
+	ok := call("Coordinator.ReduceFinish", &reduceFinishArgs, &reduceFinishReply)
+	if !ok {
+		fmt.Println("call Coordinator.ReduceFinish fail")
+	} else {
+		tmpOFile.Close()
+		os.Rename(tmpOFile.Name(), oname)
+		// fmt.Println("reduce task " + reduce_task_id + ": successfully reduce ")
+	}
 	return nil
 }
 

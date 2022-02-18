@@ -74,7 +74,7 @@ add struct `MapDone` in coordinator to indicate whether all the map tasks are fi
 
 **TODO**
 
-- [ ] use TempFile to deal with the failing if workers
+- [x] use TempFile to deal with the failing if workers
 - [ ] store `mapTask2state` in disk in case of coordinator failing
 - [ ] refactor the code of assigning tasks in one function
 - [ ] refactor the if-branch of `globalState` to switch-branch. 
@@ -103,8 +103,19 @@ Because `nReduce` is much smaller than `nMap`, I take the strategy that the redu
 - [x] steal code from `mrsequential.go` and finish `callReduce`
 - [x] send a *Reduce Task Finish* signal to the coordinator when the reduce task not existing. This funtion could be in `ReduceFinish` or in another function.
 - [x] add a `ReduceFinish` function in `mr/coordinator.go`
-- [ ] **没有任务的Worker周期性请求任务. `test-mr.sh` only creates three worker threads.**
+- [x] **没有任务的Worker周期性请求任务. `test-mr.sh` only creates three worker threads.**
 
 **Possible Improvements**
 
 * reducer merging multiple intermediate files: current verson is reading all file in memory and then merge them, so the total memory usage is `2*all kvs`. It could be imporved by merging while reading files.
+
+### 2022.2.18
+
+* Workers call the coordinator for a job unless that the coordinator asks it to exit or that the coordinator has exited.
+* **add function `checkAlive`.**: if `checkAlive[i]==0`, which means the ith worker has failed-- after 10 seconds it hasn't finish the job, the coordinator will mask the job as `unstarted`--`m[i]==0` and assign the job to another worker; when assgin task i, which means setting `m[i]=1`, `checkAlive[i]` should be set to `10`, which means the coordiantor will think the worker as crached if the task could be done in 10 seconds; when the job is done, which means setting `m[i]=2`, `checkAlive[i]` should be set to `0`, which means if task i is done then there is no need to check it.
+* `go cheakAlive` in `coordinator.go` to run the correctness of workers in separate goroutines
+* workers create temporary files initially. After calling `MapFinish` or `ReduceFinish` and getting the reponse, workers rename the files to `mr-X-Y` format for map tasks and `mr-out-X` format for reduce tasks.
+
+## PASSED ALL TESTS
+## 2022.2.7-2022.2.18
+
