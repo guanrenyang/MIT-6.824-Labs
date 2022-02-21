@@ -1,4 +1,4 @@
-# MIT-6.824-Lab1
+# Lab1-Logs
 ### Requirements
 * workers may crash but coornaditor won't
 ### 2022.2.7
